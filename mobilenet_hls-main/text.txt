@@ -1,0 +1,9 @@
+ssh -X hsinghuh@balboa.eecs.uci.edu
+ssh -Y hsinghuh@balboa.eecs.uci.edu
+source /ecelib/eceware/xilinx_2023.1/Vitis/2023.1/settings64.csh
+vitis_hls &
+
+vitis_hls -f script.tcl
+find . -name "mobilenet_top_csynth.rpt"
+scp "D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls-main\script.tcl" hsinghuh@balboa.eecs.uci.edu:~/mobilenet_hls-main\mobilenet_hls-main/
+find . -name "mobilenet_top_csynth.rpt"
