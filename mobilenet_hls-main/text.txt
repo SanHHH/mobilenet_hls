@@ -5,5 +5,5 @@ vitis_hls &
 
 vitis_hls -f script.tcl
 find . -name "mobilenet_top_csynth.rpt"
-scp "D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls-main\script.tcl" hsinghuh@balboa.eecs.uci.edu:~/mobilenet_hls-main\mobilenet_hls-main/
-find . -name "mobilenet_top_csynth.rpt"
+scp "D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer_improve/script.tcl" hsinghuh@balboa.eecs.uci.edu:~\mobilenet_hls_local_buffer_improve
+cp mobilenet_hls_local_buffer/solution_100MHz/syn/report/mobilenet_top_csynth.rpt local_buffer_baseline_standardized.rpt
