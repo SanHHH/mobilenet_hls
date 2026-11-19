@@ -1,0 +1,59 @@
+﻿  mobilenet_kernels.cpp
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(30,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(32,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(34,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(37,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(29,1): warning C4102: 'ROW': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(31,5): warning C4102: 'COL': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(33,9): warning C4102: 'TO': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(36,13): warning C4102: 'TI': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(38,17): warning C4102: 'KI': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(39,21): warning C4102: 'KJ': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(94,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(98,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(138,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(142,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(96,1): warning C4102: 'CHANNEL': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(104,1): warning C4102: 'LOAD_INPUT_ROW': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(107,1): warning C4102: 'LOAD_INPUT_COL': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(120,1): warning C4102: 'LOAD_WEIGHT_ROW': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(123,1): warning C4102: 'LOAD_WEIGHT_COL': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(136,1): warning C4102: 'OUTPUT_ROW': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(140,1): warning C4102: 'OUTPUT_COL': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(146,1): warning C4102: 'KERNEL_ROW': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(149,1): warning C4102: 'KERNEL_COL': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(185,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(187,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(189,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(192,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(184,1): warning C4102: 'ROW': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(186,5): warning C4102: 'COL': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(188,9): warning C4102: 'TO': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(191,13): warning C4102: 'TI': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(211,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(214,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(210,1): warning C4102: 'CH': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(213,5): warning C4102: 'PIX': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(230,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(233,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(229,1): warning C4102: 'TO': 未參考的標籤
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_kernels.cpp(232,5): warning C4102: 'TI': 未參考的標籤
+  mobilenet_ref.cpp
+  mobilenet_top.cpp
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(22,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(23,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(24,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(25,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(26,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(27,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(28,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(29,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(30,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(31,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(32,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(33,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(34,9): warning C4068: 未知的 pragma 'HLS'
+D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_top.cpp(56,1): warning C4102: 'LAYERS': 未參考的標籤
+  tb_mobilenet.cpp
+  正在產生程式碼...
+  mobilenet_hls_local_buffer.vcxproj -> D:\master file\Deep Learning Accelerator Design\mobilenet_hls-main\mobilenet_hls_local_buffer\mobilenet_hls_local_buffer\x64\Debug\mobilenet_hls_local_buffer.exe
