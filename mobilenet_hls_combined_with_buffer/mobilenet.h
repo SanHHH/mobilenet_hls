@@ -163,4 +163,5 @@ void mobilenet_top(const data_t *image,     /* [3][IMG_SIZE][IMG_SIZE] */
                    const int8_t *shifts,    /* [NUM_CONV]             */
                    acc_t        *logits);   /* [NUM_CLASSES]          */
 
+
 #endif
