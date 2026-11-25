@@ -104,32 +104,32 @@ void dwconv3x3(const data_t *in, data_t *out, const wgt_t *w, const bias_t *b,
     const int TILE_H = 8;
     const int TILE_W = 8;
     const int MAX_PATCH = 17;
+    const int TC = 2; // Process 2 channels in parallel (16 MACs/cycle total)
 
-    // Partition dim=2 completely (17 cols -> LUTRAM/registers) so 4 parallel
-    // horizontal reads (lx + 0..3) never suffer bank conflicts!
-    data_t input_buffer[MAX_PATCH][MAX_PATCH];
-#pragma HLS ARRAY_PARTITION variable=input_buffer complete dim=2
+    // Partition dim=1 (TC) and dim=3 (cols) completely for conflict-free parallel reads
+    data_t input_buffer[TC][MAX_PATCH][MAX_PATCH];
+#pragma HLS ARRAY_PARTITION variable=input_buffer complete dim=1
+#pragma HLS ARRAY_PARTITION variable=input_buffer complete dim=3
 
-    wgt_t weight_buffer[3][3];
+    wgt_t weight_buffer[TC][3][3];
 #pragma HLS ARRAY_PARTITION variable=weight_buffer complete dim=0
 
-    // Local 8x8 tile accumulators partitioned by factor=4 for 4 MACs/cycle at II=1
-    acc_t acc_tile[TILE_H][TILE_W];
-#pragma HLS ARRAY_PARTITION variable=acc_tile cyclic factor=4 dim=2
+    // Local 2 x 8 x 8 tile accumulators partitioned completely on TC and TILE_W
+    acc_t acc_tile[TC][TILE_H][TILE_W];
+#pragma HLS ARRAY_PARTITION variable=acc_tile complete dim=1
+#pragma HLS ARRAY_PARTITION variable=acc_tile complete dim=3
 
-CH: for (int c = 0; c < C; c++) {
-#pragma HLS LOOP_TRIPCOUNT min=16 max=512
-    const bias_t bias_c   = b[c];
-    const int8_t shift_c  = shift[c];
-    const int    w_c_off  = c * 9;
-    const int    in_c_off = c * H * H;
-    const int    out_c_off = c * Ho * Ho;
+CH_TILE: for (int cb_ch = 0; cb_ch < C; cb_ch += TC) {
+#pragma HLS LOOP_TRIPCOUNT min=8 max=256
 
-    // 1. Load 3x3 depthwise weights into registers (pipelined II=1)
-    LOAD_WEIGHT_ROW: for (int i = 0; i < 3; i++) {
-        LOAD_WEIGHT_COL: for (int j = 0; j < 3; j++) {
+    // 1. Load 2 x 3 x 3 = 18 weights into registers (unrolled by 8 to match URAM factor=8)
+    LOAD_W_TC: for (int tc = 0; tc < TC; tc++) {
+        const int c = cb_ch + tc;
+        const int w_c_off = c * 9;
+        LOAD_WEIGHT: for (int k = 0; k < 9; k++) {
 #pragma HLS PIPELINE II=1
-            weight_buffer[i][j] = w[w_c_off + i * 3 + j];
+#pragma HLS UNROLL factor=8
+            weight_buffer[tc][k / 3][k % 3] = (c < C) ? w[w_c_off + k] : (wgt_t)0;
         }
     }
 
@@ -140,57 +140,76 @@ CH: for (int c = 0; c < C; c++) {
             const int patch_h = (TILE_H - 1) * S + 3;
             const int patch_w = (TILE_W - 1) * S + 3;
 
-            // 2. Load input patch + halo into local buffer (pipelined II=1)
-            LOAD_INPUT_ROW: for (int py = 0; py < patch_h; py++) {
+            // 2. Load input patch + halo for TC=2 channels (4 pixels/cycle at II=1)
+            LOAD_IN_TC: for (int tc = 0; tc < TC; tc++) {
+                const int c = cb_ch + tc;
+                const int in_c_off = c * H * H;
+                LOAD_INPUT_ROW: for (int py = 0; py < patch_h; py++) {
 #pragma HLS LOOP_TRIPCOUNT min=10 max=17
-                LOAD_INPUT_COL: for (int px = 0; px < patch_w; px++) {
+                    LOAD_INPUT_COL: for (int px = 0; px < patch_w; px++) {
 #pragma HLS LOOP_TRIPCOUNT min=10 max=17
-#pragma HLS PIPELINE II=1
-                    const int y = rb * S + py - pad;
-                    const int x = cb * S + px - pad;
-                    input_buffer[py][px] =
-                        (y >= 0 && y < H && x >= 0 && x < H)
-                        ? in[in_c_off + y * H + x] : (data_t)0;
-                }
-            }
-
-            // 3. Initialize 8x8 tile accumulators with channel bias (4/cycle at II=1)
-            INIT_Y: for (int ty = 0; ty < TILE_H; ty++) {
-                INIT_X: for (int tx = 0; tx < TILE_W; tx++) {
 #pragma HLS PIPELINE II=1
 #pragma HLS UNROLL factor=4
-                    acc_tile[ty][tx] = bias_c;
+                        const int y = rb * S + py - pad;
+                        const int x = cb * S + px - pad;
+                        input_buffer[tc][py][px] =
+                            (c < C && y >= 0 && y < H && x >= 0 && x < H)
+                            ? in[in_c_off + y * H + x] : (data_t)0;
+                    }
                 }
             }
 
-            // 4. LOOP INTERCHANGE: Dependent 3x3 kernel reduction (KI, KJ) OUTSIDE,
-            //    independent 8x8 spatial tile (TILE_Y, TILE_X) INSIDE with UNROLL=4!
+            // 3. Initialize 2 x 8 x 8 accumulators with channel biases (16/cycle at II=1)
+            INIT_Y: for (int ty = 0; ty < TILE_H; ty++) {
+#pragma HLS PIPELINE II=1
+                INIT_TC: for (int tc = 0; tc < TC; tc++) {
+#pragma HLS UNROLL
+                    const int c = cb_ch + tc;
+                    const bias_t bias_c = (c < C) ? b[c] : (bias_t)0;
+                    INIT_X: for (int tx = 0; tx < TILE_W; tx++) {
+#pragma HLS UNROLL
+                        acc_tile[tc][ty][tx] = bias_c;
+                    }
+                }
+            }
+
+            // 4. Compute 2 channels x 8 horizontal pixels = 16 MACs/cycle at II=1
             KI: for (int i = 0; i < 3; i++) {
                 KJ: for (int j = 0; j < 3; j++) {
-                    // Read weight ONCE and broadcast across all 64 tile pixels!
-                    const acc_t w_val = (acc_t)weight_buffer[i][j];
-
                     TILE_Y: for (int ty = 0; ty < TILE_H; ty++) {
-                        TILE_X: for (int tx = 0; tx < TILE_W; tx++) {
 #pragma HLS PIPELINE II=1
-#pragma HLS UNROLL factor=4
-                            const int ly = ty * S + i;
-                            const int lx = tx * S + j;
-                            acc_tile[ty][tx] += (acc_t)input_buffer[ly][lx] * w_val;
+                        TILE_TC: for (int tc = 0; tc < TC; tc++) {
+#pragma HLS UNROLL
+                            const acc_t w_val = (acc_t)weight_buffer[tc][i][j];
+                            TILE_X: for (int tx = 0; tx < TILE_W; tx++) {
+#pragma HLS UNROLL
+                                const int ly = ty * S + i;
+                                const int lx = tx * S + j;
+                                acc_tile[tc][ty][tx] +=
+                                    (acc_t)input_buffer[tc][ly][lx] * w_val;
+                            }
                         }
                     }
                 }
             }
 
-            // 5. Requantize & store valid in-bounds tile pixels (pipelined II=1)
-            STORE_Y: for (int ty = 0; ty < TILE_H; ty++) {
-                const int row = rb + ty;
-                STORE_X: for (int tx = 0; tx < TILE_W; tx++) {
+            // 5. Requantize & store valid in-bounds pixels for TC=2 channels
+            STORE_TC: for (int tc = 0; tc < TC; tc++) {
+                const int c = cb_ch + tc;
+                if (c < C) {
+                    const int8_t shift_c = shift[c];
+                    const int out_c_off = c * Ho * Ho;
+                    STORE_Y: for (int ty = 0; ty < TILE_H; ty++) {
+                        const int row = rb + ty;
+                        STORE_X: for (int tx = 0; tx < TILE_W; tx++) {
 #pragma HLS PIPELINE II=1
-                    const int col = cb + tx;
-                    if (row < Ho && col < Ho) {
-                        out[out_c_off + row * Ho + col] =
-                            requant(acc_tile[ty][tx], shift_c, 1);
+#pragma HLS UNROLL factor=4
+                            const int col = cb + tx;
+                            if (row < Ho && col < Ho) {
+                                out[out_c_off + row * Ho + col] =
+                                    requant(acc_tile[tc][ty][tx], shift_c, 1);
+                            }
+                        }
                     }
                 }
             }
@@ -198,6 +217,7 @@ CH: for (int c = 0; c < C; c++) {
     }
 }
 }
+
 
 /* ------------------------------------------------------------------------
  * Pointwise 1x1 convolution: at every pixel, out[to] = sum_ti w[to][ti]*in[ti]
@@ -208,53 +228,95 @@ void conv1x1(const data_t *in, data_t *out, const wgt_t *w, const bias_t *b,
              int N, int M, int H, const int8_t *shift)
 {
     const int HW = H * H;
-#pragma HLS DEPENDENCE variable=w inter false
+    const int TM = 16;
+    const int TP = 8;
 
-    data_t in_pix_buf[512];
+    // Buffer 8 horizontal pixels across up to 512 input channels
+    data_t in_pix_buf[512][TP];
 #pragma HLS BIND_STORAGE variable=in_pix_buf type=ram_2p impl=bram latency=1
+#pragma HLS ARRAY_PARTITION variable=in_pix_buf cyclic factor=4 dim=2
 
-    acc_t acc_buf[512];
-#pragma HLS BIND_STORAGE variable=acc_buf type=ram_2p impl=bram latency=1
-#pragma HLS ARRAY_PARTITION variable=acc_buf cyclic factor=4 dim=1
+    // 16 output channels x 8 pixels accumulator tile (completely partitioned on TM)
+    acc_t acc_buf[TM][TP];
+#pragma HLS ARRAY_PARTITION variable=acc_buf complete dim=1
 
-ROW: for (int row = 0; row < H; row++) {
+    // Local 16-weight slice fetched once per input channel and reused across 8 pixels
+    wgt_t w_buf[TM];
+#pragma HLS ARRAY_PARTITION variable=w_buf complete dim=1
+
+    ROW: for (int row = 0; row < H; row++) {
 #pragma HLS LOOP_TRIPCOUNT min=5 max=80
-    COL: for (int col = 0; col < H; col++) {
-#pragma HLS LOOP_TRIPCOUNT min=5 max=80
-        const int pix_off = row * H + col;
 
-        LOAD_PIX: for (int ti = 0; ti < N; ti++) {
+        TILE_COL: for (int cb = 0; cb < H; cb += TP) {
+#pragma HLS LOOP_TRIPCOUNT min=1 max=10
+
+            // 1. Load 8 horizontal pixels across N channels into local BRAM
+            LOAD_PIX_TI: for (int ti = 0; ti < N; ti++) {
 #pragma HLS LOOP_TRIPCOUNT min=16 max=512
+                LOAD_PIX_P: for (int p = 0; p < TP; p++) {
 #pragma HLS PIPELINE II=1
-            in_pix_buf[ti] = in[ti * HW + pix_off];
-        }
-
-        INIT_ACC: for (int to = 0; to < M; to++) {
-#pragma HLS LOOP_TRIPCOUNT min=32 max=512
-#pragma HLS PIPELINE II=1
-            acc_buf[to] = b[to];
-        }
-
-        TI: for (int ti = 0; ti < N; ti++) {
-#pragma HLS LOOP_TRIPCOUNT min=16 max=512
-            const acc_t in_val = (acc_t)in_pix_buf[ti];
-
-            TO: for (int to = 0; to < M; to++) {
-#pragma HLS LOOP_TRIPCOUNT min=32 max=512
-#pragma HLS PIPELINE II=1
-#pragma HLS UNROLL factor=2
-                acc_buf[to] += in_val * (acc_t)w[to * N + ti];
+#pragma HLS UNROLL factor=4
+                    int col = cb + p;
+                    in_pix_buf[ti][p] = (col < H) ? in[ti * HW + row * H + col] : (data_t)0;
+                }
             }
-        }
+            
+            TILE_M: for (int tm = 0; tm < M; tm += TM) {
+#pragma HLS LOOP_TRIPCOUNT min=2 max=32
 
-        STORE_OUT: for (int to = 0; to < M; to++) {
-#pragma HLS LOOP_TRIPCOUNT min=32 max=512
+            // 2. Initialize 16 x 8 accumulators with channel biases
+            INIT_ACC_P: for (int p = 0; p < TP; p++) {
 #pragma HLS PIPELINE II=1
-            out[to * HW + pix_off] = requant(acc_buf[to], shift[to], 1);
+                INIT_ACC_M: for (int m = 0; m < TM; m++) {
+#pragma HLS UNROLL
+                    acc_buf[m][p] = (tm + m < M) ? b[tm + m] : (bias_t)0;
+                }
+            }
+
+            // 3. Compute: fetch 16 weights once per ti, reuse across 8 pixels
+            TI: for (int ti = 0; ti < N; ti++) {
+#pragma HLS LOOP_TRIPCOUNT min=16 max=512
+
+                // Fetch 16 weights from URAM (2 cycles @ 8 weights/cycle)
+                LOAD_W: for (int m = 0; m < TM; m++) {
+#pragma HLS PIPELINE II=1
+#pragma HLS UNROLL factor=8
+                    w_buf[m] = (tm + m < M) ? w[(tm + m) * N + ti] : (wgt_t)0;
+                }
+
+                // 16 parallel MACs/cycle across 8 pixels (8 cycles @ II=1)
+                COMPUTE_P: for (int p = 0; p < TP; p++) {
+#pragma HLS PIPELINE II=1
+#pragma HLS DEPENDENCE variable=acc_buf inter false
+                    const acc_t in_val = (acc_t)in_pix_buf[ti][p];
+
+                    COMPUTE_M: for (int m = 0; m < TM; m++) {
+#pragma HLS UNROLL
+                        acc_buf[m][p] += in_val * (acc_t)w_buf[m];
+                    }
+                }
+            }
+
+            // 4. Requantize & store valid in-bounds pixels back to URAM
+            STORE_M: for (int m = 0; m < TM; m++) {
+                const int out_ch = tm + m;
+                if (out_ch < M) {
+                    const int8_t sh = shift[out_ch];
+                    STORE_P: for (int p = 0; p < TP; p++) {
+#pragma HLS PIPELINE II=1
+#pragma HLS UNROLL factor=4
+                        int col = cb + p;
+                        if (col < H) {
+                            out[out_ch * HW + row * H + col] = requant(acc_buf[m][p], sh, 1);
+                        }
+                    }
+                }
+            }
         }
     }
 }
 }
+
 
 /* ------------------------------------------------------------------------
  * Global average pool: [C][H][H] -> [C]   (AvgPool_1a: 5x5 at 160 input,
@@ -345,4 +407,3 @@ void fc(const data_t *in, acc_t *logits, const wgt_t *w, const bias_t *b,
         logits[to] = acc_buf[to];
     }
 }
-
