@@ -350,6 +350,7 @@ int main(void)
     ref_mobilenet(image, weights, biases, shifts, logits_ref, ref_a, ref_b,
                   trace_layer);
     clock_t t1 = clock();
+    // Load weights/biases/shifts into URAM/BRAM + run inference
     mobilenet_top(image, fm, weights, biases, shifts, logits_hw);
     clock_t t2 = clock();
     printf("  CPU time: reference %.2f s, HLS C model %.2f s\n",
