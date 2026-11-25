@@ -211,12 +211,11 @@ void conv1x1(const data_t *in, data_t *out, const wgt_t *w, const bias_t *b,
 #pragma HLS DEPENDENCE variable=w inter false
 
     data_t in_pix_buf[512];
-#pragma HLS BIND_STORAGE variable=in_pix_buf type=ram_2p impl=bram
+#pragma HLS BIND_STORAGE variable=in_pix_buf type=ram_2p impl=bram latency=1
 
     acc_t acc_buf[512];
-#pragma HLS BIND_STORAGE variable=acc_buf type=ram_2p impl=bram
+#pragma HLS BIND_STORAGE variable=acc_buf type=ram_2p impl=bram latency=1
 #pragma HLS ARRAY_PARTITION variable=acc_buf cyclic factor=4 dim=1
-#pragma HLS DEPENDENCE variable=acc_buf inter false
 
 ROW: for (int row = 0; row < H; row++) {
 #pragma HLS LOOP_TRIPCOUNT min=5 max=80
@@ -270,9 +269,8 @@ void avgpool(const data_t *in, data_t *out, int C, int H)
     // Local BRAM accumulator buffer for all C = 512 channels
     // Cyclic factor=4 gives 8 independent BRAM ports (4 read + 4 write) for II=1
     acc_t sum_buf[512];
-#pragma HLS BIND_STORAGE variable=sum_buf type=ram_2p impl=bram
+#pragma HLS BIND_STORAGE variable=sum_buf type=ram_2p impl=bram latency=2
 #pragma HLS ARRAY_PARTITION variable=sum_buf cyclic factor=4 dim=1
-#pragma HLS DEPENDENCE variable=sum_buf inter false
 
     // 1. Initialize all 512 channel sums to zero (II=1)
     INIT_SUM: for (int c = 0; c < C; c++) {
@@ -289,6 +287,7 @@ void avgpool(const data_t *in, data_t *out, int C, int H)
 #pragma HLS LOOP_TRIPCOUNT min=512 max=512
 #pragma HLS PIPELINE II=1
 #pragma HLS UNROLL factor=2
+#pragma HLS DEPENDENCE variable=sum_buf inter false
             sum_buf[c] += (acc_t)in[c * HW + p];
         }
     }
@@ -314,9 +313,8 @@ void fc(const data_t *in, acc_t *logits, const wgt_t *w, const bias_t *b,
     // Local BRAM accumulator buffer for all M = 1001 output classes
     // Cyclic factor=4 provides 8 independent BRAM ports (4 read + 4 write) for II=1
     acc_t acc_buf[1001];
-#pragma HLS BIND_STORAGE variable=acc_buf type=ram_2p impl=bram
+#pragma HLS BIND_STORAGE variable=acc_buf type=ram_2p impl=bram latency=2
 #pragma HLS ARRAY_PARTITION variable=acc_buf cyclic factor=4 dim=1
-#pragma HLS DEPENDENCE variable=acc_buf inter false
 
     // 1. Initialize all 1001 class accumulators with biases (II=1)
     INIT_ACC: for (int to = 0; to < M; to++) {
@@ -335,6 +333,7 @@ void fc(const data_t *in, acc_t *logits, const wgt_t *w, const bias_t *b,
 #pragma HLS LOOP_TRIPCOUNT min=1001 max=1001
 #pragma HLS PIPELINE II=1
 #pragma HLS UNROLL factor=2
+#pragma HLS DEPENDENCE variable=acc_buf inter false
             acc_buf[to] += in_val * (acc_t)w[to * N + ti];
         }
     }
