@@ -1,18 +1,10 @@
 /*
- * mobilenet_top.cpp  --  HLS top function: runs the whole network
+ * mobilenet_top.cpp -- KV260 Asymmetric URAM/BRAM Hybrid (100% Legal Resource Fit)
  *
- * Direct translation of the loop in mobilenet_v1_base() (lines 246-297)
- * plus the Logits block in mobilenet_v1() (lines 367-387).
- *
- * DDR usage (the ARM host allocates these and passes their addresses):
- *   image    input picture, Q4.4, [3][160][160]
- *   fm       scratch area of 3 regions (A, B, TMP), each FM_MAX bytes.
- *            Layers ping-pong between A and B ("buffer 1 / buffer 2" in the
- *            Lecture 2 system diagram); depthwise output goes to TMP.
- *   weights / biases / shifts   packed parameters, see mobilenet.h
- *   logits   1001 raw scores; the predicted class is the largest one.
- *
- * Interface pragmas use the same style as the course's vecadd_buffer.cpp.
+ * Resource Allocation on XCK26:
+ *   - uram_weights (8-bit, factor=8)    -> 41 / 64 URAM288
+ *   - uram_fm_ab   (2*FM_MAX, factor=4) -> 19 / 64 URAM288 (Total URAM = 60 / 64)
+ *   - bram_fm_tmp  (FM_MAX, factor=4)   -> 182 / 288 BRAM18K (Total BRAM ~ 210 / 288)
  */
 #include "mobilenet.h"
 
@@ -25,59 +17,102 @@ void mobilenet_top(const data_t *image, data_t *fm, const wgt_t *weights,
 #pragma HLS INTERFACE m_axi port=biases  offset=slave bundle=gmem3 depth=6473
 #pragma HLS INTERFACE m_axi port=shifts  offset=slave bundle=gmem3 depth=5472
 #pragma HLS INTERFACE m_axi port=logits  offset=slave bundle=gmem0 depth=1001
-#pragma HLS INTERFACE s_axilite register port=image   bundle=ctrl
-#pragma HLS INTERFACE s_axilite register port=fm      bundle=ctrl
-#pragma HLS INTERFACE s_axilite register port=weights bundle=ctrl
-#pragma HLS INTERFACE s_axilite register port=biases  bundle=ctrl
-#pragma HLS INTERFACE s_axilite register port=shifts  bundle=ctrl
-#pragma HLS INTERFACE s_axilite register port=logits  bundle=ctrl
-#pragma HLS INTERFACE s_axilite register port=return  bundle=ctrl
+#pragma HLS INTERFACE s_axilite port=image   bundle=ctrl
+#pragma HLS INTERFACE s_axilite port=fm      bundle=ctrl
+#pragma HLS INTERFACE s_axilite port=weights bundle=ctrl
+#pragma HLS INTERFACE s_axilite port=biases  bundle=ctrl
+#pragma HLS INTERFACE s_axilite port=shifts  bundle=ctrl
+#pragma HLS INTERFACE s_axilite port=logits  bundle=ctrl
+#pragma HLS INTERFACE s_axilite port=return  bundle=ctrl
 
-    int H     = IMG_SIZE;   /* current feature-map height (= width) */
-    int cin   = IMG_CH;     /* current number of channels           */
-    int w_off = 0;          /* where this layer's weights start     */
-    int b_off = 0;          /* where this layer's biases start      */
-    int cur   = REGION_A;   /* region holding the current input     */
+    // =========================================================================
+    // 1. URAM TIER (60 / 64 URAM288): All Weights + Ping-Pong Regions A & B
+    // =========================================================================
+    static wgt_t uram_weights[1320160];
+#pragma HLS BIND_STORAGE variable=uram_weights type=ram_2p impl=uram latency=2
+#pragma HLS ARRAY_RESHAPE variable=uram_weights cyclic factor=9 dim=1
+
+    data_t uram_fm_ab[2 * FM_MAX];
+#pragma HLS BIND_STORAGE variable=uram_fm_ab type=ram_2p impl=uram latency=2
+#pragma HLS ARRAY_RESHAPE variable=uram_fm_ab cyclic factor=4 dim=1
+
+    // =========================================================================
+    // 2. BRAM TIER (~210 / 288 BRAM18K): Intermediate DW Buffer + Biases/Shifts
+    //    - dwconv3x3 ALWAYS reads URAM (uram_fm_ab) and writes BRAM (bram_fm_tmp)
+    //    - conv1x1   ALWAYS reads BRAM (bram_fm_tmp) and writes URAM (uram_fm_ab)
+    //    -> Zero mixed-core port conflict & zero read/write aliasing!
+    // =========================================================================
+    data_t bram_fm_tmp[FM_MAX];
+#pragma HLS BIND_STORAGE variable=bram_fm_tmp type=ram_2p impl=bram
+#pragma HLS ARRAY_RESHAPE variable=bram_fm_tmp cyclic factor=4 dim=1
+
+    static bias_t bram_biases[6473];
+#pragma HLS BIND_STORAGE variable=bram_biases type=ram_1p impl=bram
+
+    static int8_t bram_shifts[5472];
+#pragma HLS BIND_STORAGE variable=bram_shifts type=ram_1p impl=bram
+
+    // =========================================================================
+    // 3. Burst-Load Parameters from DDR into On-Chip URAM/BRAM
+    // =========================================================================
+LOAD_WEIGHTS: for (int i = 0; i < 1320160; i++) {
+#pragma HLS PIPELINE II=1
+        uram_weights[i] = weights[i];
+    }
+
+LOAD_BIASES: for (int i = 0; i < 6473; i++) {
+#pragma HLS PIPELINE II=1
+        bram_biases[i] = biases[i];
+    }
+
+LOAD_SHIFTS: for (int i = 0; i < 5472; i++) {
+#pragma HLS PIPELINE II=1
+        bram_shifts[i] = shifts[i];
+    }
+
+    int H       = IMG_SIZE;
+    int cin     = IMG_CH;
+    int w_off   = 0;
+    int b_off   = 0;
+    int cur_off = 0; // 0 = Region A, FM_MAX = Region B inside uram_fm_ab
 
     /* ---- Conv2d_0: standard 3x3 conv, stride 2, 3 -> 16 channels ---- */
     {
         const int d = scaled_depth(MOBILENET_DEFS[0].depth);
         const int s = MOBILENET_DEFS[0].stride;
-        conv3x3(image, fm + REGION_A, weights + w_off, biases + b_off,
-                cin, d, H, s, shifts + b_off);
-        w_off += d * cin * 9;
-        b_off += d;
-        H   = out_size(H, s);
-        cin = d;
-        cur = REGION_A;
+        conv3x3(image, uram_fm_ab, uram_weights + w_off, bram_biases + b_off,
+                cin, d, H, s, bram_shifts + b_off);
+        w_off  += d * cin * 9;
+        b_off  += d;
+        H       = out_size(H, s);
+        cin     = d;
+        cur_off = 0;
     }
 
     /* ---- Conv2d_1 ... Conv2d_13: depthwise 3x3 then pointwise 1x1 ---- */
 LAYERS: for (int i = 1; i < NUM_DEFS; i++) {
-        const int d  = scaled_depth(MOBILENET_DEFS[i].depth);
-        const int s  = MOBILENET_DEFS[i].stride;
-        const int Ho = out_size(H, s);
-        const int nxt = (cur == REGION_A) ? REGION_B : REGION_A;
+        const int d       = scaled_depth(MOBILENET_DEFS[i].depth);
+        const int s       = MOBILENET_DEFS[i].stride;
+        const int Ho      = out_size(H, s);
+        const int nxt_off = (cur_off == 0) ? FM_MAX : 0;
 
-        /* Conv2d_i_depthwise: cin -> cin channels, H -> Ho */
-        dwconv3x3(fm + cur, fm + REGION_TMP, weights + w_off, biases + b_off,
-                  cin, H, s, shifts + b_off);
+        dwconv3x3(uram_fm_ab + cur_off, bram_fm_tmp, uram_weights + w_off, bram_biases + b_off,
+                  cin, H, s, bram_shifts + b_off);
         w_off += cin * 9;
         b_off += cin;
 
-        /* Conv2d_i_pointwise: cin -> d channels, size stays Ho */
-        conv1x1(fm + REGION_TMP, fm + nxt, weights + w_off, biases + b_off,
-                cin, d, Ho, shifts + b_off);
+        conv1x1(bram_fm_tmp, uram_fm_ab + nxt_off, uram_weights + w_off, bram_biases + b_off,
+                cin, d, Ho, bram_shifts + b_off);
         w_off += cin * d;
         b_off += d;
 
-        cur = nxt;
-        H   = Ho;
-        cin = d;
+        cur_off = nxt_off;
+        H       = Ho;
+        cin     = d;
     }
 
-    /* ---- Logits: 5x5 average pool (at 160 input), then 1x1 conv to 1001 classes ---- */
-    avgpool(fm + cur, fm + REGION_TMP, cin, H);
-    fc(fm + REGION_TMP, logits, weights + w_off, biases + b_off,
+    /* ---- Logits: 5x5 average pool, then 1x1 conv to 1001 classes ---- */
+    avgpool(uram_fm_ab + cur_off, bram_fm_tmp, cin, H);
+    fc(bram_fm_tmp, logits, uram_weights + w_off, bram_biases + b_off,
        cin, NUM_CLASSES);
 }
