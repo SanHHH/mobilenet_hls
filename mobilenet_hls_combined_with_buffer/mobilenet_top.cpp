@@ -28,9 +28,9 @@ void mobilenet_top(const data_t *image, data_t *fm, const wgt_t *weights,
     // =========================================================================
     // 1. URAM TIER (60 / 64 URAM288): All Weights + Ping-Pong Regions A & B
     // =========================================================================
-    static wgt_t uram_weights[1320160];
+    static wgt_t uram_weights[807648];
 #pragma HLS BIND_STORAGE variable=uram_weights type=ram_2p impl=uram latency=2
-#pragma HLS ARRAY_RESHAPE variable=uram_weights cyclic factor=9 dim=1
+#pragma HLS ARRAY_RESHAPE variable=uram_weights cyclic factor=8 dim=1
 
     data_t uram_fm_ab[2 * FM_MAX];
 #pragma HLS BIND_STORAGE variable=uram_fm_ab type=ram_2p impl=uram latency=2
@@ -53,9 +53,9 @@ void mobilenet_top(const data_t *image, data_t *fm, const wgt_t *weights,
 #pragma HLS BIND_STORAGE variable=bram_shifts type=ram_1p impl=bram
 
     // =========================================================================
-    // 3. Burst-Load Parameters from DDR into On-Chip URAM/BRAM
+    // 3. Burst-Load Parameters from DDR into On-Chip URAM/BRAM 
     // =========================================================================
-LOAD_WEIGHTS: for (int i = 0; i < 1320160; i++) {
+LOAD_WEIGHTS: for (int i = 0; i < 807648; i++) {
 #pragma HLS PIPELINE II=1
         uram_weights[i] = weights[i];
     }
@@ -68,8 +68,7 @@ LOAD_BIASES: for (int i = 0; i < 6473; i++) {
 LOAD_SHIFTS: for (int i = 0; i < 5472; i++) {
 #pragma HLS PIPELINE II=1
         bram_shifts[i] = shifts[i];
-    }
-
+}
     int H       = IMG_SIZE;
     int cin     = IMG_CH;
     int w_off   = 0;
@@ -113,6 +112,6 @@ LAYERS: for (int i = 1; i < NUM_DEFS; i++) {
 
     /* ---- Logits: 5x5 average pool, then 1x1 conv to 1001 classes ---- */
     avgpool(uram_fm_ab + cur_off, bram_fm_tmp, cin, H);
-    fc(bram_fm_tmp, logits, uram_weights + w_off, bram_biases + b_off,
+    fc(bram_fm_tmp, logits, weights + w_off, bram_biases + b_off,
        cin, NUM_CLASSES);
 }
