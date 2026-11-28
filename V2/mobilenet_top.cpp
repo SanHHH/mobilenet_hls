@@ -43,14 +43,14 @@ void mobilenet_top(const data_t *image, data_t *fm, const wgt_t *weights,
     //    -> Zero mixed-core port conflict & zero read/write aliasing!
     // =========================================================================
     data_t bram_fm_tmp[FM_MAX];
-#pragma HLS BIND_STORAGE variable=bram_fm_tmp type=ram_2p impl=bram
+#pragma HLS BIND_STORAGE variable=bram_fm_tmp type=ram_2p impl=uram latency=2
 #pragma HLS ARRAY_RESHAPE variable=bram_fm_tmp cyclic factor=4 dim=1
 
     static bias_t bram_biases[6473];
 #pragma HLS BIND_STORAGE variable=bram_biases type=ram_1p impl=bram
 
     static int8_t bram_shifts[5472];
-#pragma HLS BIND_STORAGE variable=bram_shifts type=ram_1p impl=bram
+#pragma HLS BIND_STORAGE variable=bram_shifts type=ram_1p impl=lutram
 
     // =========================================================================
     // 3. Burst-Load Parameters from DDR into On-Chip URAM/BRAM 
